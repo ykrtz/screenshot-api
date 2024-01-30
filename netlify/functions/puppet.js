@@ -33,6 +33,8 @@ export async function handler(event, context) {
       deviceScaleFactor: 1,
     });
 
+    await page.waitForTimeout(5000)
+
     // Take a screenshot
     const file = await page.screenshot({
       type: 'png',
