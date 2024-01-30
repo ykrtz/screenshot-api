@@ -5,20 +5,18 @@ chromium.setHeadlessMode = true;
 chromium.setGraphicsMode = false;
 
 export async function handler(event, context) {
-  let address;
-  try {
-    // Extracting address from the POST request body
-    address = JSON.parse(event.body).address;
-  } catch (error) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: "Bad request: No address provided" }),
-    };
-  }
-
-  const url = `https://rugcheck.xyz/tokens/${address}`;
+  // Get the URL from the event object
+  const pageToScreenshot = event.queryStringParameters.page;
 
   try {
+    // Ensure the URL starts with 'https://'
+    if (!pageToScreenshot.startsWith('https://')) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'URL must start with https://' }),
+      };
+    }
+
     const browser = await puppeteer.launch({
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
@@ -26,28 +24,33 @@ export async function handler(event, context) {
     });
 
     const page = await browser.newPage();
+    await page.goto(pageToScreenshot);
 
-    await page.goto(url);
+    // Set the viewport size
+    await page.setViewport({
+      width: 1920,
+      height: 1080,
+      deviceScaleFactor: 1,
+    });
 
-    // Replace waitForSelector with a suitable one or a timeout
-    await page.waitForSelector('body', { timeout: 5000 });
-
-    // Taking a screenshot
-    const screenshot = await page.screenshot({ encoding: 'base64' });
+    // Take a screenshot
+    const file = await page.screenshot({
+      type: 'png',
+    });
 
     await browser.close();
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'image/png' },
-      body: screenshot,
+      body: file.toString('base64'),
       isBase64Encoded: true,
     };
   } catch (error) {
     console.error(error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Internal Server Error' }),
+      body: JSON.stringify({ error: 'Something went wrong' }),
     };
   }
 }
