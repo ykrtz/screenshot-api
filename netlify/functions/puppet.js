@@ -1,45 +1,53 @@
-import chromium from '@sparticuz/chromium'
-import puppeteer from 'puppeteer-core'
+import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer-core';
 
-const url = 'https://lite.cnn.com/'
-
-chromium.setHeadlessMode = true
-chromium.setGraphicsMode = false
+chromium.setHeadlessMode = true;
+chromium.setGraphicsMode = false;
 
 export async function handler(event, context) {
+  let address;
+  try {
+    // Extracting address from the POST request body
+    address = JSON.parse(event.body).address;
+  } catch (error) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error: "Bad request: No address provided" }),
+    };
+  }
+
+  const url = `https://rugcheck.xyz/tokens/${address}`;
+
   try {
     const browser = await puppeteer.launch({
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
       executablePath: process.env.CHROME_EXECUTABLE_PATH || (await chromium.executablePath('/var/task/node_modules/@sparticuz/chromium/bin')),
-    })
+    });
 
-    const page = await browser.newPage()
+    const page = await browser.newPage();
 
-    await page.goto(url)
+    await page.goto(url);
 
-    await page.waitForSelector('.title')
+    // Replace waitForSelector with a suitable one or a timeout
+    await page.waitForSelector('body', { timeout: 5000 });
 
-    const results = await page.$$eval('ul li', (articles) => {
-      return articles.map((link) => {
-        return {
-          title: link.querySelector('a').innerText,
-          url: link.querySelector('a').href,
-        }
-      })
-    })
+    // Taking a screenshot
+    const screenshot = await page.screenshot({ encoding: 'base64' });
 
-    await browser.close()
+    await browser.close();
 
     return {
       statusCode: 200,
-      body: JSON.stringify(results),
-    }
+      headers: { 'Content-Type': 'image/png' },
+      body: screenshot,
+      isBase64Encoded: true,
+    };
   } catch (error) {
-    console.error(error)
+    console.error(error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error }),
-    }
+      body: JSON.stringify({ error: 'Internal Server Error' }),
+    };
   }
 }
